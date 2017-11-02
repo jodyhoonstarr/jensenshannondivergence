@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>D3 JSD</title>
+    
+    <!-- Bootstrap core CSS -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+
+      /* Make the chart container fill the page using CSS. */
+      #chart {
+        position: fixed;
+        left: 0px;
+        right: 330px;
+        top: 0px;
+        bottom: 0px;
+        z-index: -1;
+      }
+      
+    @media (min-width: 0px) {
+        .container{
+            max-width: 300px;
+            padding-right: 30px;
+        }
+    }
+    
+    .flyover {
+       left: 150%;
+       overflow: hidden;
+       position: fixed;
+       width: 50%;
+       opacity: 0.9;
+       z-index: 1050;
+       transition: left 0.6s ease-out 0s;
+    }
+
+    .flyover-centered {
+       top: 50%;
+       transform: translate(-50%, -50%);
+    }
+    
+    .flyover.in {
+    left: 50%;
+    }
+    
+    .flyover-bottom {
+      bottom: 10px;
+    }
+
+    </style>
+    
+  </head>
+  <body>
+  
+    <div id="alertmsg1" class="alert alert-info flyover flyover-centered">
+       <h3>Your settings have been reverted</h3>
+       <p>
+          Only the number of bins can change when using <b>Rebin Only</b>. All other parameters have been reset to the last time you clicked on <b>Submit and Resample</b>.
+       </p>
+    </div>
+    
+    <div id="alertmsg2" class="alert alert-info flyover flyover-centered">
+       <h3>Change the number of bins, dude</h3>
+       <p>
+          Adjust the <b>Number of Bins</b> to see how it affects the JSD.
+       </p>
+    </div>
+  
+    <!-- Control Panel -->
+    <div class="container pull-right">
+      <div class="row">
+        <div class="navbar-right ">
+
+          <h3>
+             JSD: 
+            <span id="jsdtext">...</span>
+          </h3>
+          <hr>
+          <h3><i class="glyphicon glyphicon-tasks"></i> Control Panel</h3>
+          
+    <div class="container" id="settings">
+      <form>
+      
+        <!-- Sample P Slider -->
+        <div class="form-group row">
+          <label class="col-form-label"><i class="glyphicon glyphicon-star"></i>Sample P: </label>
+          <small type="text" id="amountp_l"></small>
+          <small type="text"> - </small><small type="text" id="amountp_r"></small>
+          <small type="text"> ( &sigma; </small>
+          <small type="text" id="p_mu">...</small>
+          <small type="text">, &mu; </small>
+          <small type="text" id="p_sigma">...</small>
+          <small type="text"> ) </small>
+          <div id="sliderp"></div>
+        </div>
+        
+        <!-- Sample Q Slider -->
+        <div class="form-group row">
+          <label class="col-form-label "><i class="glyphicon glyphicon-star-empty"></i>Sample Q: </label>
+          <small type="text" id="amountq_l"></small>
+          <small type="text"> - </small><small type="text" id="amountq_r"></small>
+          <small type="text"> ( &sigma; </small>
+          <small type="text" id="q_mu">...</small>
+          <small type="text">, &mu; </small>
+          <small type="text" id="q_sigma">...</small>
+          <small type="text"> ) </small>
+          <div id="sliderq"></div>
+        </div>
+        
+        <!-- Number of Samples Input -->
+        <div class="form-group row">
+          <label class="col-form-label"><i class="glyphicon glyphicon-equalizer"></i> Number of Samples</label>
+          <input type="number" class="form-control" id="in_samples" value="60">
+        </div>
+        
+        <!-- Number of Bins Input -->
+        <div class="form-group row">
+          <label class="col-form-label"><i class="glyphicon glyphicon-stats"></i> Number of Bins</label>
+          <input type="number" class="form-control" id="in_bins" value="29">
+        </div>
+        
+        <!-- Distribution Selection -->
+        <div class="form-group row">
+          <label class="col-form-label"><i class="glyphicon glyphicon-signal"></i> Distribution Type</label>
+          <div id="dist_checkbox">
+            <button type="button" class="btn btn-primary" id="gauss" style="width:49%">Capped Gaussian</button>
+            <button type="button" class="btn btn-primary" id="uniform" style="width:49%">Random Uniform</button>
+          </div>
+        </div>
+        
+        <!-- Go! Selection -->
+        <div class="form-group row">
+          <label for="dist_checkbox" class="col-form-label"><i class="glyphicon glyphicon-flash"></i> Go!</label>
+          <button type="button" class="btn btn-block btn-success" id="resample" >Submit and Resample</button>
+          <button type="button" class="btn btn-block btn-secondary" id="rebin" >Rebin Only</button>
+        </div>
+        
+        <hr>
+        
+        <div class="form-group row">
+            
+          <label class="col-form-label">Post Calculation Statistics</label><br>
+        
+          <small type="text"> P actual: </small>
+          <small type="text" id="amountp_min">...</small>
+          <small type="text"> - </small>
+          <small type="text" id="amountp_max">...</small><br>
+          <small type="text"> ( mean </small>
+          <small type="text" id="amountp_mean">...</small>
+          <small type="text">, stdev </small>
+          <small type="text" id="amountp_stdev">...</small>
+          <small type="text"> ) </small>
+          
+          <br>
+          <small type="text"> Q actual: </small>
+          <small type="text" id="amountq_min">...</small>
+          <small type="text"> - </small>
+          <small type="text" id="amountq_max">...</small><br>
+          <small type="text"> ( mean </small>
+          <small type="text" id="amountq_mean">...</small>
+          <small type="text">, stdev </small>
+          <small type="text" id="amountq_stdev">...</small>
+          <small type="text"> ) </small>
+          
+          <br>
+          <small type="text"> Bin range: </small>
+          <small type="text" id="binl">...</small>
+          <small type="text"> - </small>
+          <small type="text" id="binr">...</small>
+          
+          <br>
+          <small type="text"> Bin width: </small>
+          <small type="text" id="binwidth">...</small>
+          
+          <br>
+          <small type="text"> Capped gaussian is limited to &plusmn;3 stdevs</small>
+
+        </div>
+        
+        
+      </form>
+    </div>
+          
+        </div><!-- /span-3 -->
+      </div>
+    </div>
+
+    <!-- D3 Full Page Chart -->
+    <div id="chart"></div>
+    
+    <!-- jquery slider requirements -->
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    
+    <!-- numjs for maths -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/numjs/0.12.4/numjs.min.js"></script>
+    
+    <!-- D3 v4 -->
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+
+    <script>
+      // Alert popup1
+      function showAlert1() {
+        if ( !$('#alertmsg1').is( '.in' ) ) {
+          $('#alertmsg1').addClass('in');
+
+          setTimeout(function() {
+            $('#alertmsg1').removeClass('in');
+          }, 8000);
+        }
+      }
+      
+      // Alert popup2
+      function showAlert2() {
+        if ( !$('#alertmsg2').is( '.in' ) ) {
+          $('#alertmsg2').addClass('in');
+
+          setTimeout(function() {
+            $('#alertmsg2').removeClass('in');
+          }, 4000);
+        }
+      }
+     
+      // Dismiss Alert
+      $('#alertmsg1').click(function(evt){  
+        if((evt.target.tagName == 'DIV') || (evt.target.tagName == 'P') || (evt.target.tagName == 'B') || (evt.target.tagName == 'H3')){
+          $('#alertmsg1').removeClass('in');
+        }
+      });
+      
+      // Dismiss Alert
+      $('#alertmsg2').click(function(evt){  
+        if((evt.target.tagName == 'DIV') || (evt.target.tagName == 'P') || (evt.target.tagName == 'B') || (evt.target.tagName == 'H3')){
+          $('#alertmsg2').removeClass('in');
+        }
+      });
+    
+      // Slider function1
+      $( function() {
+        $( "#sliderp" ).slider({
+          range: true,
+          min: 0,
+          max: 500,
+          values: [ 75, 300 ],
+          slide: function( event, ui ) {
+            $( "#amountp_l" ).text( ui.values[ 0 ] );
+            $( "#amountp_r" ).text( ui.values[ 1 ] );
+            $( "#p_mu" ).text( ((+$( "#amountp_r" ).text() - +$( "#amountp_l" ).text()) / 2) + +$( "#amountp_l" ).text() );
+            let tempp_sigma = ((+$( "#amountp_r" ).text() - +$( "#amountp_l" ).text()) / 6);
+            $( "#p_sigma" ).text( +tempp_sigma.toFixed(2));
+          }
+        });
+        $( "#amountp_l" ).text( $( "#sliderp" ).slider( "values", 0 ) );
+        $( "#amountp_r" ).text( $( "#sliderp" ).slider( "values", 1 ) );
+        $( "#p_mu" ).text( ((+$( "#amountp_r" ).text() - +$( "#amountp_l" ).text()) / 2) + +$( "#amountp_l" ).text() );
+        let tempp_sigma = ((+$( "#amountp_r" ).text() - +$( "#amountp_l" ).text()) / 6);
+        $( "#p_sigma" ).text( +tempp_sigma.toFixed(2));
+      } );
+      
+      // Slider function2
+      $( function() {
+        $( "#sliderq" ).slider({
+          range: true,
+          min: 0,
+          max: 500,
+          values: [ 150, 375 ],
+          slide: function( event, ui ) {
+            $( "#amountq_l" ).text( ui.values[ 0 ] );
+            $( "#amountq_r" ).text( ui.values[ 1 ] );
+            $( "#q_mu" ).text( ((+$( "#amountq_r" ).text() - +$( "#amountq_l" ).text()) / 2) + +$( "#amountq_l" ).text() );
+            let tempq_sigma = ((+$( "#amountq_r" ).text() - +$( "#amountq_l" ).text()) / 6);
+            $( "#q_sigma" ).text( +tempq_sigma.toFixed(2));
+          }
+        });
+        $( "#amountq_l" ).text( $( "#sliderq" ).slider( "values", 0 ) );
+        $( "#amountq_r" ).text( $( "#sliderq" ).slider( "values", 1 ) );
+        $( "#q_mu" ).text( ((+$( "#amountq_r" ).text() - +$( "#amountq_l" ).text()) / 2) + +$( "#amountq_l" ).text() );
+            let tempq_sigma = ((+$( "#amountq_r" ).text() - +$( "#amountq_l" ).text()) / 6);
+        $( "#q_sigma" ).text( +tempq_sigma.toFixed(2));
+      } );
+      
+      // Toggle of Distribution Type
+      $('#dist_checkbox button').click(function() {
+        $(this).addClass('active').siblings().removeClass('active');
+        inputDistType=this.id;
+      });
+      
+      // Control Panel vars
+      var inputPLeftBound; //the slider left bound for the P sample
+      var inputPRightBound; //the slider right bound for the P sample
+      var inputQLeftBound; //the slider left bound for the Q sample
+      var inputQRightBound; //the slider right bound for the Q sample
+      var inputSamples; //the user input number of samples
+      var inputBincount; //the user input bin count
+      var inputDistType="gauss"; //the user input distribution type - defaults to gauss
+      var mostRecentDistType;
+      
+      // Calculation vars
+      var psample;
+      var qsample;
+      var binarray;
+      var pbinned;
+      var qbinned;
+      var jsd;
+      
+
+      var p;
+      var q;
+      var bins;
+      
+      function applyUniform(n, leftbound, rightbound){
+        let dist = nj.random(n);
+        let scale = nj.array(Array.apply(null, Array(n)).map(function(){return rightbound-leftbound}))
+        let offset = nj.array(Array.apply(null, Array(n)).map(function(){return leftbound}))
+        return nj.add(nj.multiply(dist, scale), offset)
+      }
+      
+      function applyGauss(n, leftbound, rightbound){
+        let values = [];
+        let avg = ((rightbound - leftbound)/2) + leftbound;
+        // 1/6th of the range, no reason why
+        let stdev = (rightbound - avg)/3; 
+        for (i = 0; i < n; ++i) {
+          let loopval = gaussian(avg, stdev)();
+          if (loopval > rightbound) { loopval = rightbound }
+          if (loopval < leftbound) { loopval = leftbound }
+          values[i] = loopval;
+        }
+        return nj.array(values);
+      }
+        
+      function gaussian(mean, stdev) {
+        var y2;
+        var use_last = false;
+        return function() {
+          var y1;
+          if(use_last) {
+            y1 = y2;
+            use_last = false;
+          }
+          else {
+            var x1, x2, w;
+            do {
+              x1 = 2.0 * Math.random() - 1.0;
+              x2 = 2.0 * Math.random() - 1.0;
+              w  = x1 * x1 + x2 * x2;
+            } while( w >= 1.0);
+            w = Math.sqrt((-2.0 * Math.log(w))/w);
+            y1 = x1 * w;
+            y2 = x2 * w;
+            use_last = true;
+          }
+
+          var retval = mean + stdev * y1;
+          if(retval > 0) 
+            return retval;
+          return -retval;
+           }
+        }
+
+      // get values from user inputs - distribution type handles itself in button
+      function getSettings() {
+        inputPLeftBound = +($('#amountp_l').text());
+        inputPRightBound = +($('#amountp_r').text());
+        inputQLeftBound = +($('#amountq_l').text());
+        inputQRightBound = +($('#amountq_r').text());
+        inputSamples = +$('#in_samples').val();
+        inputBincount = +$('#in_bins').val();
+      }
+      
+      function getBinCount(){
+        inputBincount = +$('#in_bins').val();
+      }
+      
+      function procBinsAndJSD(){
+        createBinsFromRange(); //creates bins
+        binData(); //assigns sample data to bins
+        newJSD(); // calculates the JSD
+      }
+      
+      function checkRebinChanges(){
+        if ((inputPLeftBound != +($('#amountp_l').text())) || (inputPRightBound != +($('#amountp_r').text())) || (inputQLeftBound != +($('#amountq_l').text())) || (inputQRightBound != +($('#amountq_r').text())) || (inputSamples != +$('#in_samples').val()) || (mostRecentDistType != inputDistType)){
+           showAlert1();
+           $( "#amountp_l" ).text( inputPLeftBound );
+           $( "#amountp_r" ).text( inputPRightBound );
+           $( "#amountq_l" ).text( inputQLeftBound );
+           $( "#amountq_r" ).text( inputQRightBound );
+           $( "#in_samples" ).val( inputSamples );
+           $( "#sliderp" ).slider({ values: [ inputPLeftBound, inputPRightBound ] });
+           $( "#sliderq" ).slider({ values: [ inputQLeftBound, inputQRightBound ] });
+           $("#"+inputDistType).removeClass('active');
+           $("#"+mostRecentDistType).addClass('active');
+           inputDistType = mostRecentDistType;
+           $('#in_bins').val(inputBincount);
+           
+        } else if ( +$('#in_bins').val() == inputBincount)  {
+          showAlert2();
+        }
+      }
+      
+      function newJSD(){
+      
+        let jsdData = nj.zeros(inputBincount);
+        let pbinnorm = divByFirstNorm(pbinned);
+        let qbinnorm = divByFirstNorm(qbinned);
+        
+        for (var i = 0; i < inputBincount; i++) {
+
+          let pstep = pbinnorm.get(i);
+          let qstep = qbinnorm.get(i);
+          let mstep = (pstep + qstep) / 2;
+
+          if (pstep!=0 && qstep!=0) {
+            jsdData.set(i, (( qstep * Math.log2(qstep/mstep) ) + ( pstep * Math.log2(pstep/mstep) )) / 2 );
+          } else if (pstep!=0 && qstep==0) {
+            jsdData.set(i, ( pstep * Math.log2(pstep/mstep) ) / 2 );
+          } else if (pstep==0 && qstep!=0) {
+            jsdData.set(i, ( qstep * Math.log2(qstep/mstep) ) / 2 );
+          } else {
+            jsdData.set(i, 0 );
+          }
+        }
+        jsd = nj.sum(jsdData);
+      }
+        
+      function divByFirstNorm(data){
+        let firstnorm = nj.sum(nj.abs(data));
+        return nj.divide(data,nj.array(Array.apply(null, Array(inputBincount)).map(function(){return firstnorm})));
+      }
+      
+      function binData(){
+        pbinned = assignBins(psample, binarray);
+        qbinned = assignBins(qsample, binarray);
+      }
+      
+      function assignBins(data, bins){
+        let dataLength = data.size;
+        let binnedData = nj.zeros(inputBincount);
+        for (var i = 0; i < inputBincount; i++) {
+          for (var j = 0; j < dataLength; j++) {
+            if (between(data.get(j), bins.get(i), bins.get(i+1))) {
+                binnedData.set(i,binnedData.get(i) + 1);
+            }
+          }
+        }
+        return binnedData;
+      }
+      
+      function between(x, min, max) {
+        return x >= min && x <= max;
+      }
+      
+      function createBinsFromRange() {
+        let leftbound = Math.min(inputPLeftBound , inputQLeftBound);
+        let rightbound = Math.max(inputPRightBound , inputQRightBound);
+        let incrementArray = nj.arange(inputBincount + 1);
+        let binSize = (rightbound - leftbound)/inputBincount;
+        let binSizeArray = nj.array(Array.apply(null, Array(inputBincount + 1)).map(function(){return binSize}));
+        binarray = incrementArray.multiply(binSizeArray).add(leftbound);
+      }
+      
+      function sampleData(){
+        if (inputDistType=="uniform") {
+          psample = applyUniform(inputSamples, inputPLeftBound, inputPRightBound);
+          qsample = applyUniform(inputSamples, inputQLeftBound, inputQRightBound);
+        } else if (inputDistType=="gauss"){
+          psample = applyGauss(inputSamples, inputPLeftBound, inputPRightBound);
+          qsample = applyGauss(inputSamples, inputQLeftBound, inputQRightBound);
+        }
+        $( "#amountp_mean" ).text( Math.round(psample.mean() * 100) / 100 );
+        $( "#amountp_stdev" ).text( Math.round(psample.std() * 100) / 100 );
+        $( "#amountq_mean" ).text( Math.round(qsample.mean() * 100) / 100 );
+        $( "#amountq_stdev" ).text( Math.round(qsample.std() * 100) / 100 );
+        $( "#amountp_min" ).text( Math.round(psample.min() * 100) / 100 );
+        $( "#amountp_max" ).text( Math.round(psample.max() * 100) / 100 );
+        $( "#amountq_min" ).text( Math.round(qsample.min() * 100) / 100 );
+        $( "#amountq_max" ).text( Math.round(qsample.max() * 100) / 100 );
+        amountp_min
+        // remember most recent sample
+        mostRecentDistType = inputDistType;
+      }
+      
+      function toStandardArray(data){
+        let dataArray = []
+        for (i = 0; i < data.size; ++i) {
+          dataArray.push(data.get(i));
+        }
+        return dataArray;
+      }
+      
+      function prepDataForD3(){
+        p = toStandardArray(pbinned);
+        q = toStandardArray(qbinned);
+        bins = toStandardArray(binarray);
+        $( "#binr" ).text( binarray.max());
+        $( "#binl" ).text( binarray.min());
+        $( "#binwidth" ).text( Math.round((bins[1] - bins[0]) * 100) / 100);
+      }
+      
+      function setJSDText(){
+      $( "#jsdtext" ).text( Math.round(jsd * 1000) / 1000 );
+      }
+      
+      
+      // fire initial
+      $(document).ready(function() {
+        getSettings(); //gets settings from cpanel
+        $("#"+inputDistType).addClass('active'); //sets default distribution type
+        sampleData(); //creates data samples
+        procBinsAndJSD() // calcs bins, assigns samples to bins, creates JSD
+        prepDataForD3();
+        redrawD3();
+        setJSDText();
+      });
+      
+      $('#resample').on('click', function() {
+        getSettings();
+        sampleData();
+        procBinsAndJSD();
+        prepDataForD3();
+        redrawD3();
+        setJSDText();
+      });
+      
+      $('#rebin').on('click', function() {
+        checkRebinChanges();
+        getBinCount();
+        procBinsAndJSD();
+        prepDataForD3();
+        redrawD3();
+        setJSDText();
+      });
+      
+      
+      // D3 Vars
+      var chartDiv = document.getElementById("chart");
+
+      function redrawD3(){
+        d3.select(chartDiv).selectAll("*").remove();
+        data = [p, q];
+        
+        // set the dimensions and margins of the graph
+        var margin = {top: 20, right: 20, bottom: 50, left: 40},
+          width = chartDiv.clientWidth - margin.left - margin.right,
+          height = chartDiv.clientHeight - margin.top - margin.bottom;
+        
+        var y = d3.scaleLinear()
+          .domain([0, d3.max([d3.max(data[0]), d3.max(data[1])])])
+          .range([height, margin.top]);
+          
+        var x0 = d3.scaleBand()
+          .domain(d3.range(inputBincount))
+          .range([0, width])
+          .paddingInner([0.1])
+          .paddingOuter([0.3])
+          .align([0.5]);;
+        
+        var x1 = d3.scaleBand()
+          .domain(d3.range(data.length))
+          .range([0, x0.bandwidth()]);
+          
+        var color = d3.scaleOrdinal(d3.schemeCategory10);
+        
+        var yAxis = d3.axisLeft()
+          .scale(y);
+        
+        var xAxis = d3.axisBottom()
+          .scale(x0);
+        
+      var svg = d3.select(chartDiv).append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+        .attr("transform", 
+              "translate(" + margin.left + "," + margin.top + ")");
+        
+        svg.selectAll(".bar")
+          .data(data)
+          .enter().append("g")
+            .style("fill", function(d, i) { return color(i); })
+            .attr("transform", function(d, i) { return "translate(" + x1(i) + ", 0 )"; })
+          .selectAll("rect")
+            .data(function(d) { return d; })
+          .enter().append("rect")
+            .attr("width", x1.bandwidth())
+            .attr("height", function(d) { return height - y(d); } )
+            .attr("x", function(d, i) { return x0(i); })
+            .attr("y", function(d) { return y(d); });
+        
+          // add the x Axis
+          svg.append("g")
+              .attr("transform", "translate(0," + height + ")")
+              .call(d3.axisBottom(x0));
+
+          // add the y Axis
+          svg.append("g")
+              .call(d3.axisLeft(y));
+              
+            // text label for the x axis
+          svg.append("text")             
+              .attr("transform",
+                    "translate(" + (width/2) + " ," + 
+                                   (height + margin.top + 20) + ")")
+              .style("text-anchor", "middle")
+              .text("Bins");
+
+          // text label for the y axis
+          svg.append("text")
+              .attr("transform", "rotate(-90)")
+              .attr("y", 0 - margin.left)
+              .attr("x",0 - (height / 2))
+              .attr("dy", "1em")
+              .style("text-anchor", "middle")
+              .text("Counts");  
+
+      }
+
+      // Redraw based on the new size whenever the browser window is resized.
+      window.addEventListener("resize", redrawD3);
+
+    </script>
+    
+    
+  </body>
+</html>
